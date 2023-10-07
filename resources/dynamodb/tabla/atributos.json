@@ -1,0 +1,10 @@
+[
+   {
+      "AttributeName": "modulo",
+      "AttributeType": "S"
+   },
+   {
+      "AttributeName": "alumno",
+      "AttributeType": "S"
+   }
+]

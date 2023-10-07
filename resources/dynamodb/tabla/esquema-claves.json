@@ -1,0 +1,10 @@
+[
+   {
+      "AttributeName": "modulo",
+      "KeyType": "HASH"
+   },
+   {
+      "AttributeName": "alumno",
+      "KeyType": "RANGE"
+   }
+]
