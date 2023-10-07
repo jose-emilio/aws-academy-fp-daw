@@ -2,5 +2,6 @@
     "modulo": { "S": "BD" },
     "alumno": { "S": "Miguel Dominguez" },
     "curso": { "N": "2023" },
-    "nota": { "NS": ["8.5"] }
+    "nota": { "L": [ { "N": "8.5" } ] },
+    "convocatoria": { "N": "1" }
 }
