@@ -1,0 +1,410 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Plantilla que crea una VPC para el despliegue de una infraestructura altamente disponible en dos AZs. Cada AZ puede tener una subred publica y una subred privada. Ademas, permite crear una instancia bastion en la subred publica en la AZ1
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - 
+        Label:
+          default: "Configuracion de la VPC"
+        Parameters:
+          - Nombre
+          - VPC
+          - SubredesPublicas
+          - SubredesPrivadas
+          - NATGateways          
+      - 
+        Label:
+          default: Subredes Publicas
+        Parameters:
+          - SubredPublica1
+          - SubredPublica2
+      - 
+        Label:
+          default: Subredes Privadas
+        Parameters:
+          - SubredPrivada1
+          - SubredPrivada2
+      -  
+        Label:
+          default: "Configuracion del bastion"
+        Parameters:
+          - Bastion
+    ParameterLabels:
+      Nombre:
+        default: "Nombre de la VPC"
+      VPC:
+        default: "CIDR VPC"
+      SubredesPublicas: 
+        default: "Crear Subredes publicas?"
+      SubredesPrivadas: 
+        default: "Crear Subredes privadas?"
+      SubredPublica1:
+        default: "Subred Publica 1"
+      SubredPrivada1:
+        default: "Subred Privada 1"
+      SubredPublica2:
+        default: "Subred Publica 2"
+      SubredPrivada2:
+        default: "Subred Privada 2"
+      NATGateways:
+        default: "Crear NAT Gateways?"
+      Bastion:
+        default: "Crear Bastion?"
+Parameters:
+  AmiID:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Description: ID de la AMI
+    Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-arm64-gp2'
+  Nombre:
+    Type: String
+  VPC:
+    Type: String
+    Description: Bloque CIDR asignado a la VPC
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Default: 10.2.0.0/16
+  SubredPublica1:
+    Type: String
+    Description: Bloque CIDR asignado a la subred publica de la AZ1. El bloque CIDR debe ser un subconjunto del bloque CIDR de la VPC
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Default: 10.2.0.0/24
+  SubredPrivada1:
+    Type: String
+    Description: Bloque CIDR asignado a la subred privada de la AZ1 donde se creara la capa de aplicacion. El bloque CIDR debe ser un subconjunto del bloque CIDR de la VPC
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Default: 10.2.1.0/24
+  SubredPublica2:
+    Type: String
+    Description: Bloque CIDR asignado a la subred publica de la AZ2. El bloque CIDR debe ser un subconjunto del bloque CIDR de la VPC
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Default: 10.2.2.0/24
+  SubredPrivada2:
+    Type: String
+    Description: Bloque CIDR asignado a la subred privada de la AZ2 donde se creara la capa de aplicacion. El bloque CIDR debe ser un subconjunto del bloque CIDR de la VPC
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Default: 10.2.3.0/24
+  SubredesPublicas:
+    Type: String
+    Description: Indica si deben crearse o no las subredes publicas
+    AllowedValues:
+      - "SI"
+      - "NO"
+    Default: "SI"
+  SubredesPrivadas:
+    Type: String
+    Description: Indica si deben crearse o no las subredes privadas
+    AllowedValues:
+      - "SI"
+      - "NO"
+    Default: "SI"
+  NATGateways:
+    Type: String
+    Description: Indica si deben crearse o no los dos Gateway NAT en la VPC
+    AllowedValues:
+      - "SI"
+      - "NO"
+    Default: "SI"
+  Bastion:
+    Type: String
+    Description: Indica si debe crears una instancia EC2 bastion
+    AllowedValues:
+      - "SI"
+      - "NO"
+    Default: "SI"
+Conditions:
+  CrearSubredesPublicas: !Equals [!Ref "SubredesPublicas","SI"]
+  CrearSubredesPrivadas: !Equals [!Ref "SubredesPrivadas","SI"]
+  CrearNATGateways: !And [!Equals [!Ref "NATGateways","SI"],!Equals [!Ref "SubredesPublicas","SI"],!Equals [!Ref "SubredesPrivadas","SI"]]
+  CrearBastion: !And [!Equals [!Ref "SubredesPublicas","SI"],!Equals [!Ref "Bastion","SI"]]
+Resources:
+  miVPC:
+    Type: AWS::EC2::VPC
+    Properties: 
+      CidrBlock: !Ref VPC
+      EnableDnsHostnames: True
+      EnableDnsSupport: True
+      Tags:
+        - Key: "Name"
+          Value: !Sub
+            - 'vpc-${nombreVPC}'
+            - nombreVPC: !Ref Nombre
+  miIGW:
+    Type: AWS::EC2::InternetGateway
+    Condition: CrearSubredesPublicas
+    Properties:
+      Tags:
+      - Key: "Name"
+        Value: !Sub
+          - 'igw-${nombreVPC}'
+          - nombreVPC: !Ref Nombre
+  miAsociacionIGW:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Condition: CrearSubredesPublicas
+    Properties: 
+      InternetGatewayId: !Ref miIGW
+      VpcId: !Ref miVPC
+  publica1:
+    Type: AWS::EC2::Subnet
+    Condition: CrearSubredesPublicas
+    Properties:
+      VpcId: !Ref miVPC
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: ""
+      CidrBlock: !Ref SubredPublica1
+      MapPublicIpOnLaunch: True
+      Tags:
+        - Key: "Name"
+          Value: !Sub
+            - '${nombreVPC}-publica-1'
+            - nombreVPC: !Ref Nombre
+  privada1:
+    Type: AWS::EC2::Subnet
+    Condition: CrearSubredesPrivadas
+    Properties:
+      VpcId: !Ref miVPC
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: ""
+      CidrBlock: !Ref SubredPrivada1
+      Tags:
+        - Key: "Name"
+          Value: !Sub
+            - '${nombreVPC}-privada-1'
+            - nombreVPC: !Ref Nombre
+  publica2:
+    Type: AWS::EC2::Subnet
+    Condition: CrearSubredesPublicas
+    Properties:
+      VpcId: !Ref miVPC
+      AvailabilityZone:
+        Fn::Select:
+          - 1
+          - Fn::GetAZs: ""
+      CidrBlock: !Ref SubredPublica2
+      MapPublicIpOnLaunch: True
+      Tags:
+        - Key: "Name"
+          Value: !Sub
+            - '${nombreVPC}-publica-2'
+            - nombreVPC: !Ref Nombre
+  privada2:
+    Type: AWS::EC2::Subnet
+    Condition: CrearSubredesPrivadas
+    Properties:
+      VpcId: !Ref miVPC
+      AvailabilityZone:
+        Fn::Select:
+          - 1
+          - Fn::GetAZs: ""
+      CidrBlock: !Ref SubredPrivada2
+      Tags:
+        - Key: "Name"
+          Value: !Sub
+            - '${nombreVPC}-privada-2'
+            - nombreVPC: !Ref Nombre
+  eip1:
+    Type: AWS::EC2::EIP
+    Condition: CrearNATGateways
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: "Name"
+          Value: !Sub
+            - '${nombreVPC}-eip-nat-1'
+            - nombreVPC: !Ref Nombre
+  eip2:
+    Type: AWS::EC2::EIP
+    Condition: CrearNATGateways
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: "Name"
+          Value: !Sub
+            - '${nombreVPC}-eip-nat-2'
+            - nombreVPC: !Ref Nombre
+  NAT1:
+    Type: AWS::EC2::NatGateway
+    Condition: CrearNATGateways
+    Properties:
+      AllocationId: !GetAtt eip1.AllocationId
+      SubnetId: !Ref publica1
+      Tags: 
+        - Key: "Name"
+          Value: !Sub
+            - '${nombreVPC}-nat-1'
+            - nombreVPC: !Ref Nombre
+  NAT2:
+    Type: AWS::EC2::NatGateway
+    Condition: CrearNATGateways
+    Properties:
+      AllocationId: !GetAtt eip2.AllocationId
+      SubnetId: !Ref publica2
+      Tags: 
+        - Key: "Name"
+          Value: !Sub
+            - '${nombreVPC}-nat-2'
+            - nombreVPC: !Ref Nombre
+  rutasPublicas:
+    Type: AWS::EC2::RouteTable
+    Condition: CrearSubredesPublicas
+    Properties:
+      VpcId: !Ref miVPC
+      Tags: 
+        - Key: "Name"
+          Value: !Sub
+            - '${nombreVPC}-ruta-publica'
+            - nombreVPC: !Ref Nombre
+  rutaIGW:
+    Type: AWS::EC2::Route
+    Condition: CrearSubredesPublicas
+    DependsOn: miIGW
+    Properties:
+      RouteTableId: !Ref rutasPublicas
+      GatewayId: !Ref miIGW
+      DestinationCidrBlock: '0.0.0.0/0'
+  rutasPrivadas1:
+    Type: AWS::EC2::RouteTable
+    Condition: CrearSubredesPrivadas
+    Properties:
+      VpcId: !Ref miVPC
+      Tags: 
+        - Key: "Name"
+          Value: !Sub
+            - '${nombreVPC}-ruta-privada-1'
+            - nombreVPC: !Ref Nombre
+  rutasPrivadas2:
+    Type: AWS::EC2::RouteTable
+    Condition: CrearSubredesPrivadas
+    Properties:
+      VpcId: !Ref miVPC
+      Tags: 
+        - Key: "Name"
+          Value: !Sub
+            - '${nombreVPC}-ruta-privada-2'
+            - nombreVPC: !Ref Nombre
+  rutaNAT1:
+    Type: AWS::EC2::Route
+    Condition: CrearNATGateways
+    DependsOn: NAT1
+    Properties:
+      RouteTableId: !Ref rutasPrivadas1
+      NatGatewayId: !Ref NAT1
+      DestinationCidrBlock: '0.0.0.0/0'
+  rutaNAT2:
+    Type: AWS::EC2::Route
+    Condition: CrearNATGateways
+    DependsOn: NAT2
+    Properties:
+      RouteTableId: !Ref rutasPrivadas2
+      NatGatewayId: !Ref NAT2
+      DestinationCidrBlock: '0.0.0.0/0'
+  asociacionSubredPub1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: CrearSubredesPublicas
+    Properties: 
+      RouteTableId: !Ref rutasPublicas
+      SubnetId: !Ref publica1
+  asociacionSubredPub2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: CrearSubredesPublicas
+    Properties: 
+      RouteTableId: !Ref rutasPublicas
+      SubnetId: !Ref publica2
+  asociacionSubredPriv1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: CrearSubredesPrivadas
+    Properties: 
+      RouteTableId: !Ref rutasPrivadas1
+      SubnetId: !Ref privada1
+  asociacionSubredPriv2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: CrearSubredesPrivadas
+    Properties: 
+      RouteTableId: !Ref rutasPrivadas2
+      SubnetId: !Ref privada2
+  grupoSegBastion:
+    Type: AWS::EC2::SecurityGroup
+    Condition: CrearBastion
+    Properties:
+      VpcId: !Ref miVPC
+      GroupDescription: Grupo de seguridad para la instancia EC2 bastion. No permite trafico de entrada, se debe administrar mediante AWS SSM Session Manager
+  RolEC2:
+    Type: AWS::IAM::Role
+    Condition: CrearBastion
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "ec2.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Path: "/"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+  PerfilInstanciaEC2:
+    Type: AWS::IAM::InstanceProfile
+    Condition: CrearBastion
+    Properties:
+      Roles:
+        - !Ref RolEC2
+      Path: "/"
+  bastion:
+    Type: AWS::EC2::Instance
+    Condition: CrearBastion
+    Properties:
+      ImageId: !Ref AmiID
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: ""
+      InstanceType: t4g.micro
+      SecurityGroupIds:
+        - !Ref grupoSegBastion
+      SubnetId: !Ref publica1
+      IamInstanceProfile: !Ref PerfilInstanciaEC2
+      UserData:
+        Fn::Base64:
+          !Sub |
+            #!/bin/bash
+            yum update -y
+      Tags:
+        - Key: "Name"
+          Value: !Sub
+            - 'bastion-${nombreVPC}'
+            - nombreVPC: !Ref Nombre
+Outputs:
+  VPC:
+    Description: ID de la VPC
+    Value: !GetAtt miVPC.VpcId
+  Publica1:
+    Description: ID de la subred publica 1
+    Value: !GetAtt publica1.SubnetId
+    Condition: CrearSubredesPublicas
+  Publica2:
+    Description: ID de la subred publica 2
+    Value: !GetAtt publica2.SubnetId
+    Condition: CrearSubredesPublicas
+  Privada1:
+    Description: ID de la subred privada 1
+    Value: !GetAtt privada1.SubnetId
+    Condition: CrearSubredesPrivadas
+  Privada2:
+    Description: ID de la subred privada 2
+    Value: !GetAtt privada2.SubnetId
+    Condition: CrearSubredesPrivadas
+  TablaRutasPublica:
+    Description: ID de la tabla de rutas publica
+    Value: !Ref rutasPublicas
+    Condition: CrearSubredesPublicas
+  TablaRutasPrivada1:
+    Description: ID de la tabla de rutas privada 1
+    Value: !Ref rutasPrivadas1
+    Condition: CrearSubredesPrivadas
+  TablaRutasPrivada2:
+    Description: ID de la tabla de rutas privada 2
+    Value: !Ref rutasPrivadas2
+    Condition: CrearSubredesPrivadas
