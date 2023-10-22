@@ -25,7 +25,6 @@ cumplan una serie de condiciones. En el ejemplo siguiente se obtienen los módul
 
         aws dynamodb scan --table-name curso --filter-expression "alumno = :al\" --expression-attribute-values file://operaciones/scan/valores.json --projection-expression "modulo,nota"
 
-* **Query**. Obtiene todos los elementos de una partición de una tabla
-que, opcionalmente, cumplan una serie de condiciones. El siguiente ejemplo obtiene para un módulo concreto y un conjunto de alumnos, especificados en el fichero `valores.json`, el nombre del alumno y su nota:
+* **Query**. Obtiene todos los elementos de una partición de una tabla que, opcionalmente, cumplan una serie de condiciones. El siguiente ejemplo obtiene para un módulo concreto aquellos alumnos que lo han cursado en un año concreto y lo han aprobado en la primera convocatoria. Estos datos están especificados en el fichero `valores.json`:
 
-        aws dynamodb query --table-name curso --key-condition-expression "modulo= :mod AND alumno BETWEEN :al1 AND :al2" --filter-expression "curso = :cur" --expression-attribute-values file://operaciones/query/valores.json --projection-expression "alumno, nota"
+        aws dynamodb query --table-name curso --key-condition-expression "modulo= :mod" --filter-expression "curso = :cur AND nota[0]>=:n" --expression-attribute-values file://operaciones/query/valores.json --projection-expression "alumno, nota"
