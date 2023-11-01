@@ -1,0 +1,60 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Crea dos instancias EC2 en dos subredes publicas en una VPC
+Parameters:
+  AmiID:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Description: ID de la AMI
+    Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-arm64-gp2'
+Resources:
+  VPC:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: "vpc.yaml"
+      Parameters:
+        Nombre: "Practica-EFS"
+        VPC: "10.1.0.0/16"
+        SubredesPublicas: "SI"
+        SubredesPrivadas: "SI"
+        AZ: 2
+        NATGateways: "NO"
+        Bastion: "NO"
+        LearnerLab: "SI"
+  GrupoSeguridad:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !GetAtt VPC.Outputs.VPC
+      GroupDescription: Grupo de seguridad para los clientes NFS. Se administran mediante AWS SSM por lo que no necesitan reglas de entrada
+  Instancia1:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AmiID
+      InstanceType: t4g.micro
+      SecurityGroupIds:
+        - !Ref GrupoSeguridad
+      SubnetId: !GetAtt VPC.Outputs.Publica1
+      IamInstanceProfile: LabInstanceProfile
+      UserData:
+        Fn::Base64:
+          !Sub |
+            #!/bin/bash
+            yum update -y
+      Tags:
+        - Key: "Name"
+          Value: "Instancia1"
+  Instancia2:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AmiID
+      InstanceType: t4g.micro
+      SecurityGroupIds:
+        - !Ref GrupoSeguridad
+      SubnetId: !GetAtt VPC.Outputs.Publica2
+      IamInstanceProfile: LabInstanceProfile
+      UserData:
+        Fn::Base64:
+          !Sub |
+            #!/bin/bash
+            yum update -y
+      Tags:
+        - Key: "Name"
+          Value: "Instancia2"
