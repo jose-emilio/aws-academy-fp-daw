@@ -24,6 +24,9 @@ Resources:
     Properties:
       VpcId: !GetAtt VPC.Outputs.VPC
       GroupDescription: Grupo de seguridad para los clientes NFS. Se administran mediante AWS SSM por lo que no necesitan reglas de entrada
+      Tags:
+        - Key: "Name"
+          Value: "sg-ec2"
   Instancia1:
     Type: AWS::EC2::Instance
     Properties:
