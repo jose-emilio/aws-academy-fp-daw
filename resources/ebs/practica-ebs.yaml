@@ -17,13 +17,13 @@ Resources:
       ImageId: !Ref UltimaAMI
       IamInstanceProfile: LabInstanceProfile
       BlockDeviceMappings:
-        - DeviceName: "/dev/sda1"
+        - DeviceName: "/dev/sdf"
           Ebs:
             VolumeSize: 10
             Encrypted: true
             DeleteOnTermination: true
             VolumeType: gp3
-        - DeviceName: "/dev/sda2"
+        - DeviceName: "/dev/sdg"
           Ebs:
             VolumeSize: 15
             Encrypted: false
@@ -38,13 +38,14 @@ Resources:
           !Sub |
             #!/bin/bash
             yum update -y
-            mkdir /mnt/sda1 /mnt/sda2
-            mkfs /dev/sda1
-            mkfs /dev/sda2
-            mount -t ext4 /dev/sda1 /mnt/sda1
-            mount -t ext4 /dev/sda2 /mnt/sda2
-            echo "Archivo de texto 1" > /mnt/sda1/texto1.txt
-            echo "Archivo de texto 2" > /mnt/sda2/texto2.txt
+            yum install -y tree
+            mkdir /mnt/sdf /mnt/sdg
+            mkfs /dev/sdf
+            mkfs /dev/sdg
+            mount -t ext4 /dev/sda1 /mnt/sdf
+            mount -t ext4 /dev/sda2 /mnt/sdg
+            echo "Archivo de texto 1" > /mnt/sdf/texto1.txt
+            echo "Archivo de texto 2" > /mnt/sdg/texto2.txt
   InstanciaEC2B:
     Type: AWS::EC2::Instance
     Properties:
