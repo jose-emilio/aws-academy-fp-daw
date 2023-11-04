@@ -1,0 +1,46 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Crea una instancia EC2 con dos volumenes EBS
+Parameters:
+  UltimaAMI:
+    Type:  'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-arm64-gp2'
+Resources:
+  InstanciaEC2:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t4g.micro
+      SecurityGroups: [!Ref GrupoSeguridad]
+      ImageId: !Ref UltimaAMI
+      IamInstanceProfile: LabInstanceProfile
+      BlockDeviceMappings:
+        - DeviceName: "/dev/sda1"
+          Ebs:
+            VolumeSize: 10
+            Encrypted: true
+            DeleteOnTermination: true
+            VolumeType: gp3
+        - DeviceName: "/dev/sda2"
+          Ebs:
+            VolumeSize: 15
+            Encrypted: false
+            DeleteOnTermination: true
+            VolumeType: gp3
+      Tags:
+        - Key: Name
+          Value: Instancia-Practica-EBS
+      UserData:
+        Fn::Base64:
+          !Sub |
+            #!/bin/bash
+            yum update -y
+            mkdir /mnt/sda1 /mnt/sda2
+            mkfs /dev/sda1
+            mkfs /dev/sda2
+            mount -t ext4 /dev/sda1 /mnt/sda1
+            mount -t ext4 /dev/sda2 /mnt/sda2
+            echo "Archivo de texto 1" > /mnt/sda1/texto1.txt
+            echo "Archivo de texto 2" > /mnt/sda2/texto2.txt
+  GrupoSeguridad:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Sin acceso de entrada
