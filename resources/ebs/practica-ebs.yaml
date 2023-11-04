@@ -5,10 +5,14 @@ Parameters:
     Type:  'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
     Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-arm64-gp2'
 Resources:
-  InstanciaEC2:
+  InstanciaEC2A:
     Type: AWS::EC2::Instance
     Properties:
       InstanceType: t4g.micro
+      AvailabilityZone: 
+        Fn::Select: 
+          - 0
+          - Fn::GetAZs: ""
       SecurityGroups: [!Ref GrupoSeguridad]
       ImageId: !Ref UltimaAMI
       IamInstanceProfile: LabInstanceProfile
@@ -25,9 +29,10 @@ Resources:
             Encrypted: false
             DeleteOnTermination: true
             VolumeType: gp3
+      PropagateTagsToVolumeOnCreation: true
       Tags:
         - Key: Name
-          Value: Instancia-Practica-EBS
+          Value: Instancia-EBS-A
       UserData:
         Fn::Base64:
           !Sub |
@@ -40,6 +45,36 @@ Resources:
             mount -t ext4 /dev/sda2 /mnt/sda2
             echo "Archivo de texto 1" > /mnt/sda1/texto1.txt
             echo "Archivo de texto 2" > /mnt/sda2/texto2.txt
+  InstanciaEC2B:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t4g.micro
+      AvailabilityZone: 
+        Fn::Select: 
+          - 1
+          - Fn::GetAZs: ""
+      SecurityGroups: [!Ref GrupoSeguridad]
+      ImageId: !Ref UltimaAMI
+      IamInstanceProfile: LabInstanceProfile
+      PropagateTagsToVolumeOnCreation: true
+      Tags:
+        - Key: Name
+          Value: Instancia-EBS-B
+  InstanciaEC2C:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t4g.micro
+      AvailabilityZone: 
+        Fn::Select: 
+          - 2
+          - Fn::GetAZs: ""
+      SecurityGroups: [!Ref GrupoSeguridad]
+      ImageId: !Ref UltimaAMI
+      IamInstanceProfile: LabInstanceProfile
+      PropagateTagsToVolumeOnCreation: true
+      Tags:
+        - Key: Name
+          Value: Instancia-EBS-C
   GrupoSeguridad:
     Type: AWS::EC2::SecurityGroup
     Properties:
