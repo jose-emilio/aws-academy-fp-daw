@@ -42,8 +42,8 @@ Resources:
             mkdir /mnt/sdf /mnt/sdg
             mkfs /dev/sdf
             mkfs /dev/sdg
-            mount -t ext4 /dev/sda1 /mnt/sdf
-            mount -t ext4 /dev/sda2 /mnt/sdg
+            mount -t ext4 /dev/sdf /mnt/sdf
+            mount -t ext4 /dev/sdg /mnt/sdg
             echo "Archivo de texto 1" > /mnt/sdf/texto1.txt
             echo "Archivo de texto 2" > /mnt/sdg/texto2.txt
   InstanciaEC2B:
