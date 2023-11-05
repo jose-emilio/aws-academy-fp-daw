@@ -63,6 +63,12 @@ Resources:
       Tags:
         - Key: Name
           Value: Instancia-EBS-B
+      UserData:
+        Fn::Base64:
+          !Sub |
+            #!/bin/bash
+            yum update -y
+            yum install -y tree
   InstanciaEC2C:
     Type: AWS::EC2::Instance
     Properties:
@@ -78,6 +84,12 @@ Resources:
       Tags:
         - Key: Name
           Value: Instancia-EBS-C
+      UserData:
+        Fn::Base64:
+          !Sub |
+            #!/bin/bash
+            yum update -y
+            yum install -y tree
   GrupoSeguridad:
     Type: AWS::EC2::SecurityGroup
     Properties:
