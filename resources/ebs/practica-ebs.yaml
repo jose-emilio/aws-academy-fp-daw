@@ -40,10 +40,12 @@ Resources:
             yum update -y
             yum install -y tree
             mkdir /mnt/sdf /mnt/sdg
-            mkfs /dev/sdf
-            mkfs /dev/sdg
+            mkfs -t ext4 /dev/sdf
+            mkfs -t ext4 /dev/sdg
             mount -t ext4 /dev/sdf /mnt/sdf
             mount -t ext4 /dev/sdg /mnt/sdg
+            echo "UUID=$(blkid -s UUID -o value /dev/sdf) /mnt/sdf ext4 defaults,nofail" >> /etc/fstab
+            echo "UUID=$(blkid -s UUID -o value /dev/sdg) /mnt/sdg ext4 defaults,nofail" >> /etc/fstab
             echo "Archivo de texto 1" > /mnt/sdf/texto1.txt
             echo "Archivo de texto 2" > /mnt/sdg/texto2.txt
   InstanciaEC2B:
