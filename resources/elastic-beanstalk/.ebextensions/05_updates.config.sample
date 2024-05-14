@@ -1,0 +1,29 @@
+option_settings:
+  aws:elasticbeanstalk:command:
+    DeploymentPolicy: AllAtOnce
+
+option_settings:
+  aws:elasticbeanstalk:command:
+    DeploymentPolicy: Rolling
+    BatchSizeType: Percentage
+    BatchSize: 25
+
+option_settings:
+  aws:elasticbeanstalk:command:
+    DeploymentPolicy: RollingWithAdditionalBatch
+    BatchSizeType: Fixed
+    BatchSize: 5
+
+option_settings:
+  aws:elasticbeanstalk:command:
+    DeploymentPolicy: TrafficSplitting
+  aws:elasticbeanstalk:trafficsplitting:
+    NewVersionPercent: "15"
+    EvaluationTime: "10"
+
+option_settings:
+  aws:elasticbeanstalk:command:
+    DeploymentPolicy: Immutable
+    HealthCheckSuccessThreshold: Warning
+    IgnoreHealthCheck: true
+    Timeout: "900"

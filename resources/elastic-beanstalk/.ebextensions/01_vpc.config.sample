@@ -1,0 +1,7 @@
+option_settings:
+   aws:ec2:vpc:
+      VPCId: <ID-VPC>
+      AssociatePublicIpAddress: 'false'
+      ELBScheme: public
+      ELBSubnets: <Subredes-Publicas-ALB separadas por comas>
+      Subnets: <Subredes-Privadas-Instancias-EC2 separadas por comas>

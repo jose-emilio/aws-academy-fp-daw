@@ -1,0 +1,7 @@
+option_settings:
+  aws:elasticbeanstalk:application:environment:
+    RDS_HOSTNAME: <DNS-servidor-RDS>
+    RDS_USER_NAME: <nombre-usuario-RDS>
+    RDS_DB_NAME: <nombre-BD>
+    RDS_DB_SECRET: <nombre-secreto-SSM>
+    AWS_REGION: <nombre-region>
