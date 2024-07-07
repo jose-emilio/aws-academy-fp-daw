@@ -69,3 +69,53 @@ Resources:
                   })
               }
 
+  CognitoUserPool:
+    Type: "AWS::Cognito::UserPool"
+    Properties: 
+      UserPoolName: "HipotecaUserPool"
+      AutoVerifiedAttributes: 
+        - "email"
+      UsernameAttributes: 
+        - "email"
+      Policies: 
+        PasswordPolicy: 
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireUppercase: true
+          RequireSymbols: true
+      Schema: 
+        - AttributeDataType: "String"
+          Name: "email"
+          Required: true
+          Mutable: true
+        - AttributeDataType: "String"
+          Name: "name"
+          Required: false
+          Mutable: true
+      AccountRecoverySetting: 
+        RecoveryMechanisms: 
+          - Name: "verified_email"
+            Priority: 1
+
+  CognitoUserPoolClient:
+    Type: "AWS::Cognito::UserPoolClient"
+    Properties: 
+      ClientName: "HipotecaApp"
+      UserPoolId: 
+        Ref: "CognitoUserPool"
+      ExplicitAuthFlows: 
+        - "ALLOW_REFRESH_TOKEN_AUTH"
+        - "ALLOW_USER_PASSWORD_AUTH"
+      GenerateSecret: false
+
+Outputs:
+  UserPoolId:
+    Description: "ID del pool de usuarios de Cognito"
+    Value: 
+      Ref: "CognitoUserPool"
+
+  UserPoolClientId:
+    Description: "ID de la aplicación cliente HipotecaApp"
+    Value: 
+      Ref: "CognitoUserPoolClient"
