@@ -1,0 +1,71 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Despliegue de función Lambda para calcular hipoteca con EURIBOR
+
+Resources:
+  CalcularHipotecaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.calcularHipoteca
+      Architectures:
+        - arm64
+      Role: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/LabRole
+      Runtime: python3.12
+      Layers:
+        - !Sub arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-arm64-requests:6
+      Code:
+        ZipFile: |
+          import json
+          import requests
+
+          def obtener_euribor():
+              # URL de la API para obtener el EURIBOR
+              url = "https://data-api.ecb.europa.eu/service/data/FM/M.U2.EUR.RT.MM.EURIBOR3MD_.HSTA?lastNObservations=1&detail=dataonly&format=jsondata"
+              response = requests.get(url)
+              if response.status_code == 200:
+                  data = response.json()
+                  # Extraer el EURIBOR desde la respuesta de la API
+                  euribor = float(data["dataSets"][0]["series"]["0:0:0:0:0:0:0"]["observations"]["0"][0])/100
+                  return euribor
+              else:
+                  raise Exception("No se pudo obtener el EURIBOR actual.")
+
+          def calcular_cuota_mensual(principal, tasa_anual, plazo_anos):
+              tasa_mensual = tasa_anual / 12
+              numero_pagos = plazo_anos * 12
+              cuota_mensual = principal * (tasa_mensual * (1 + tasa_mensual)**numero_pagos) / (((1 + tasa_mensual)**numero_pagos) - 1)
+              return cuota_mensual
+
+          # Manejador de la funcion Lambda
+          def calcularHipoteca(event, context):
+              
+              precio_vivienda = event['precio_vivienda']
+              entrada_vivienda = event['entrada_vivienda']
+              tasa_diferencial = event['tasa_diferencial']/100
+              plazo_anos = event['plazo_anos']
+              
+              # Obtener el EURIBOR actual
+              euribor = obtener_euribor()
+              
+              # Calcular la cantidad a financiar
+              cantidad_a_financiar = precio_vivienda - entrada_vivienda
+              
+              # Calcular la tasa de interés anual total
+              tasa_anual_total = euribor + tasa_diferencial
+              
+              # Calcular la cuota mensual
+              cuota_mensual = calcular_cuota_mensual(cantidad_a_financiar, tasa_anual_total, plazo_anos)
+              
+              # Calcular el total de intereses pagados
+              total_pagos = cuota_mensual * plazo_anos * 12
+              total_intereses = total_pagos - cantidad_a_financiar
+              
+              return {
+                  'statusCode': 200,
+                  'body': json.dumps({
+                      'cantidad_a_financiar': cantidad_a_financiar,
+                      'tasa_anual': round(tasa_anual_total*100,2),
+                      'cuota_mensual': round(cuota_mensual,2),
+                      'total_intereses': round(total_intereses,2)
+                  })
+              }
+
