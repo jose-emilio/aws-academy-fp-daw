@@ -1,0 +1,130 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  Cloud9Environment:
+    Type: AWS::Cloud9::EnvironmentEC2
+    Properties:
+      ConnectionType: CONNECT_SSH
+      InstanceType: t3.small
+      AutomaticStopTimeMinutes: 30
+      ImageId: resolve:ssm:/aws/service/cloud9/amis/amazonlinux-2023-x86_64
+      Description: Entorno de AWS Cloud9 aprovisionado mediante AWS CloudFormation. ¡No borrar!
+
+  RunCommand:
+    Type: AWS::SSM::Association
+    DependsOn:
+      - CustomLambda
+    Properties:
+      Name: 'AWS-RunShellScript'
+      Targets:
+        - Key: 'tag:aws:cloud9:environment'
+          Values: 
+            - !Ref Cloud9Environment
+      Parameters:
+        workingDirectory: ['/home/ec2-user/environment']
+        executionTimeout: ['3600']
+        commands:
+          - !Sub |
+            #!/bin/bash
+            mkdir -p web
+            cd web || exit
+            curl -fsSL https://github.com/jose-emilio/aws-academy-fp-daw/raw/main/resources/sqs/sqs.zip -o sqs.zip
+            unzip -q sqs.zip
+            rm sqs.zip
+
+  CustomLambda:
+    Description: Bootstrap de instancia de entorno Cloud9 para asociar perfil de instancia, reiniciar y registrar con AWS SSM
+    Type: Custom::BootstrapInstancia
+    DependsOn:
+    - FuncionBootStrap
+    - Cloud9Environment
+    Properties:
+      ServiceToken: !GetAtt FuncionBootStrap.Arn
+      StackName: !Sub ${AWS::StackName}
+      EnvironmentId: !Ref Cloud9Environment
+      InstanceProfileName: LabInstanceProfile
+      InstanceProfileArn: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:instance-profile/LabInstanceProfile
+
+  FuncionBootStrap:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.lambda_handler
+      Role: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/LabRole
+      Runtime: python3.9
+      MemorySize: 256
+      Timeout: '600'
+      Code:
+        ZipFile: |
+          from __future__ import print_function
+          import boto3
+          import botocore
+          import json
+          import os
+          import time
+          import traceback
+          import cfnresponse
+          import logging
+
+          logger = logging.getLogger()
+          logger.setLevel("INFO")
+          
+          def lambda_handler(event, context):
+
+              responseData = {}
+
+              status = cfnresponse.SUCCESS
+              
+              if event['RequestType'] == 'Delete':
+                  responseData = {'Success': 'Custom Resource removed'}
+                  cfnresponse.send(event, context, status, responseData, 'CustomResourcePhysicalID')              
+          
+              if event['RequestType'] == 'Create':
+                  try:
+                      ec2 = boto3.client('ec2')
+
+                      # Se obtiene la instancia por la etiqueta aws:cloudformation:environment
+                      instance = ec2.describe_instances(Filters=[{'Name': 'tag:aws:cloud9:environment','Values': [event['ResourceProperties']['EnvironmentId']]}])['Reservations'][0]['Instances'][0]
+          
+                      iam_instance_profile = {
+                          'Arn': event['ResourceProperties']['InstanceProfileArn'],
+                          'Name': event['ResourceProperties']['InstanceProfileName']
+                      }
+          
+                      # Esperar a que la instancia esté lista
+                      instance_state = instance['State']['Name']
+
+                      while instance_state != 'running':
+                          time.sleep(5)
+                          instance_state = ec2.describe_instances(InstanceIds=[instance['InstanceId']])
+          
+                      # Asociar el perfil de la instancia
+                      try:
+                        response = ec2.associate_iam_instance_profile(IamInstanceProfile=iam_instance_profile, InstanceId=instance['InstanceId'])
+                        
+                        r_ec2 = boto3.resource('ec2')
+
+                        response = ec2.reboot_instances(InstanceIds=[instance['InstanceId']])
+                        
+                        # Se da tiempo a la instancia para que se registre con AWS SSM
+                        time.sleep(60)
+
+                      except botocore.exceptions.ClientError as error:
+                        if error.response['Error']['Code'] == 'IncorrectState' and f"There is an existing association for instance {instance['InstanceId']}" == error.response['Error']['Message']:
+                          logger.warn("Already Associated")
+                        else:
+                          raise error
+  
+                      responseData = {'Success': 'Iniciado bootstrapping de la instancia: '+instance['InstanceId']}
+                      cfnresponse.send(event, context, status, responseData, 'CustomResourcePhysicalID')
+                      
+                  except Exception as e:
+                      status = cfnresponse.FAILED
+                      print(traceback.format_exc())
+                      responseData = {'Error': traceback.format_exc(e)}
+                  finally:
+                      cfnresponse.send(event, context, status, responseData, 'CustomResourcePhysicalID')
+Outputs:
+  Cloud9EnvironmentURL:
+    Description: URL del entorno de AWS Cloud9
+    Value: !Sub 'https://${AWS::Region}.console.aws.amazon.com/cloud9/ide/${Cloud9Environment}/'
+    Export:
+      Name: Cloud9EnvironmentURL
