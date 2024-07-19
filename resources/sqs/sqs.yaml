@@ -26,6 +26,7 @@ Resources:
           - !Sub |
             #!/bin/bash
             mkdir -p web
+            chown ec2-user:ec2-user web
             cd web || exit
             curl -fsSL https://github.com/jose-emilio/aws-academy-fp-daw/raw/main/resources/sqs/sqs.zip -o sqs.zip
             unzip -q sqs.zip
